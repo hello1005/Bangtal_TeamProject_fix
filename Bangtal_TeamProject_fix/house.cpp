@@ -179,3 +179,5 @@ int main(void) {
 	// Starting a game
 	startGame(villageScene);
 }
+
+
