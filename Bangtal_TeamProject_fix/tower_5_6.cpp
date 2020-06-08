@@ -199,14 +199,14 @@ bool checkCollision(int xStart, int xEnd, int yStart, int yEnd) {
 	// Check a collsion, then return a result.
 	
 	// About Collision:
-    // We can find 'collision' with position and size.
-    // If enemy attack's X is about 400 ~ 600,
-    // then X_MIN <= player's X <= 360 (360 can be replaced with 400 - SIZE) or 600 <= player's X <= X_MAX
-    // If enemy attack's Y is about 230 ~ 300,
-    // then Y_MIN <= player's Y <= 160 (160 can be replaced with 230 - SIZE) or 300 <= player's Y <= Y_MAX
-    
-    // Conclusion:
-    // If a <= attack's range <= b, then player will be hit when (a - SIZE) < player's position < b
+	// We can find 'collision' with position and size.
+	// If enemy attack's X is about 400 ~ 600,
+	// then X_MIN <= player's X <= 360 (360 can be replaced with 400 - SIZE) or 600 <= player's X <= X_MAX
+	// If enemy attack's Y is about 230 ~ 300,
+	// then Y_MIN <= player's Y <= 160 (160 can be replaced with 230 - SIZE) or 300 <= player's Y <= Y_MAX
+	    
+	// Conclusion:
+	// If a <= attack's range <= b, then player will be hit when (a - SIZE) < player's position < b
 	
 	bool xCollision = ((xStart - iconX_SIZE) < iconX) and (iconX < xEnd);
 	bool yCollision = ((yStart - iconY_SIZE) < iconY) and (iconY < yEnd);
