@@ -176,7 +176,7 @@ int main(void) {
 	locateObject(house, villageScene, 750, 195);
 	showObject(house);
 
-	// Starting a game
+	// Start a game
 	startGame(villageScene);
 }
 

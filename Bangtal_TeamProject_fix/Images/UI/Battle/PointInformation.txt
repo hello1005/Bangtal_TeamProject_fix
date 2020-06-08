@@ -1,0 +1,6 @@
+greyBox : 200, 70, 1.0f;//x좌표, y좌표, scale
+warriorIcon : 620, 245, 1.0f;
+enemyHp : 7, 620, 0.65f;
+attack : 300, 80, 0.65f;
+item : 620, 80, 0.65f;
+avoid : 900, 80, 0.6f;
