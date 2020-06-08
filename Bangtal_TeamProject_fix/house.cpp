@@ -1,3 +1,5 @@
+/*
+
 // Bangtal Library, Team Project
 // 20200690 JinCheol Park, Code about House 
 
@@ -36,20 +38,16 @@ int messageCnt = 0;
 // Scenes and Objects.
 SceneID villageScene;
 ObjectID house, casino;
-/*
-SceneID towerScene, battleScene, gameOverScene;
-ObjectID tower, store;
-ObjectID items[20];
-ObjectID slotMachine;
-ObjectID fruits[9];
-*/
+// SceneID towerScene, battleScene, gameOverScene;
+// ObjectID tower, store;
+// ObjectID items[20];
+// ObjectID slotMachine;
+// ObjectID fruits[9];
 
-/*
 // Characters (Not Implemented)
-ObjectID player;
-int playerX, playerY;
-int playerHp, playerMaxHp, playerAtk, playerDef;
-*/
+// ObjectID player;
+// int playerX, playerY;
+// int playerHp, playerMaxHp, playerAtk, playerDef;
 
 // Start at Day1, End at Day30
 int day = 1;
@@ -180,4 +178,4 @@ int main(void) {
 	startGame(villageScene);
 }
 
-
+*/
