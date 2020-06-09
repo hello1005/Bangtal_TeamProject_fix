@@ -15,14 +15,19 @@ TimerID moveTimer;
 const Second MOVE_TICK = 0.01f;
 const int MOVE_SPEED = 10;
 
-// Const variable for turn
-const int PLAYER = 0;
-const int ENEMY = 1;
-
-// Const variable for immune state
+// Animation for immune state
 TimerID immuneTimer;
 const Second IMMUNE_TICK = 0.05f;
 const int IMMUNE_TIME = 20;
+
+// Animation for attack (Test)
+TimerID testAttackTimer;
+const Second TEST_TICK = 0.01f;
+const int GRAVITY = 1;
+
+// Const variable for turn
+const int PLAYER = 0;
+const int ENEMY = 1;
 
 // ====================================================================================
 
@@ -57,6 +62,10 @@ int enemyHp, enemyMaxHp, enemyAtk, enemyDef;
 const int enemyY_FIXED = 410;
 const int enemyHpBarX_FIXED = 333, enemyHpBarY_FIXED = 660;
 
+ObjectID enemyTestAttack;
+int testAttackX = 550, testAttackY = 500;
+int dyTest = 0;
+
 // Turn
 int turn = PLAYER;
 
@@ -78,9 +87,12 @@ void battle(void);
 bool checkCollision(int xStart, int xEnd, int yStart, int yEnd);
 void checkHp(int kind);
 
+void testAttack(void);
+
 void showGold(void);
 
 void timerCallback(TimerID timer);
+void mouseCallback(ObjectID object, int x, int y, MouseAction action);
 void keyboardCallback(KeyCode code, KeyState state);
 
 // ====================================================================================
@@ -92,6 +104,9 @@ void gameInit(void) {
 	// Timers for animation
 	moveTimer = createTimer(MOVE_TICK);
 	startTimer(moveTimer);
+
+	// Timers for attack (Test)
+	testAttackTimer = createTimer(TEST_TICK);
 
 	// Scenes
 	towerScene = createScene("towerScene", "./Images/Backgrounds/Tower_Inside.png");
@@ -218,6 +233,17 @@ void playerIconMove(void) {
 void battle(void) {
 	// Start a battle.
 	// When battle ends: Player selects avoid, Player died, Enemy died.
+
+	// 만약 '플레이어'의 턴이라면, Attack/Item/Avoid 버튼을 보여주고 턴을 쓰게 한다.
+	// 그 후, 턴을 PLAYER -> ENEMY로 바꾸고 turnTimer를 만들고 이용하여 setTimer(), startTimer()를 통해 타이머 콜백을 실행한다.
+	// 만약 '적'의 턴이라면, 적의 공격 패턴들을 구현한 후 하나를 실행한다. (랜덤이든, 확률을 설정하든 알아서)
+	// 그 후, 턴을 ENEMY -> PLAYER로 바꾸고 위와 동일한 방식으로 타이머 콜백을 실행한다.
+
+	// 만약 플레이어의 HP가 0이 될 경우 타이머 콜백을 실행하지 않고 다른 함수를 이용해 탑을 탈출.
+	// 만약 플레이어가 Avoid를 선택했을 경우 타이머 콜백을 실행하지 않고 전투를 탈출.
+	// 만약 적의 HP가 0이 될 경우 타이머 콜백을 실행하지 않고 Avoid 때와는 다른 함수를 이용해 승리.
+	
+	// turnTimer를 받은 타이머 콜백에서는 이 함수를 다시 실행한다.
 }
 
 bool checkCollision(int xStart, int xEnd, int yStart, int yEnd) {
@@ -271,6 +297,23 @@ void checkHp(int kind) {
 	else {
 		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_0%");
 	}
+}
+
+void testAttack(void) {
+	// Attack (test)
+
+	testAttackX = 550;
+	testAttackY = 500;
+	dyTest = 0;
+
+	enemyTestAttack = createObject("./Images/Enemies/TestAttack.png");
+	locateObject(enemyTestAttack, battleScene, testAttackX, testAttackY);
+	showObject(enemyTestAttack);
+
+	printf("testAttack() \n");
+
+	setTimer(testAttackTimer, TEST_TICK);
+	startTimer(testAttackTimer);
 }
 
 void showGold(void) {
@@ -343,6 +386,26 @@ void timerCallback(TimerID timer) {
 			playerIconMove();
 		}
 	}
+	else if (timer == testAttackTimer) {
+		dyTest -= GRAVITY;
+		testAttackY += dyTest;
+
+		locateObject(enemyTestAttack, battleScene, testAttackX, testAttackY);
+
+		if (testAttackY < 50) {
+			hideObject(enemyTestAttack);
+		}
+		else {
+			setTimer(testAttackTimer, TEST_TICK);
+			startTimer(testAttackTimer);
+		}
+	}
+}
+
+void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
+	if (object == enemy) {
+		testAttack();
+	}
 }
 
 void keyboardCallback(KeyCode code, KeyState state) {
@@ -392,6 +455,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 int main(void) {
 	// Set callback functions.
 	setTimerCallback(timerCallback);
+	setMouseCallback(mouseCallback);
 	setKeyboardCallback(keyboardCallback);
 
 	// Start a game.
