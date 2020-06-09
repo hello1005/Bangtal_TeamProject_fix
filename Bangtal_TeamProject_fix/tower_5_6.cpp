@@ -19,6 +19,11 @@ const int MOVE_SPEED = 10;
 const int PLAYER = 0;
 const int ENEMY = 1;
 
+// Const variable for immune state
+TimerID immuneTimer;
+const Second IMMUNE_TICK = 0.05f;
+const int IMMUNE_TIME = 20;
+
 // ====================================================================================
 
 // Scenes and Objects
@@ -55,6 +60,12 @@ const int enemyHpBarX_FIXED = 333, enemyHpBarY_FIXED = 660;
 // Turn
 int turn = PLAYER;
 
+// Gold
+int gold = 359;
+ObjectID goldList[3];
+int goldX[3] = { 1040, 1067, 1094 };
+int goldY = 595;
+
 // ====================================================================================
 
 // Functions
@@ -66,6 +77,8 @@ void playerIconMove(void);
 void battle(void);
 bool checkCollision(int xStart, int xEnd, int yStart, int yEnd);
 void checkHp(int kind);
+
+void showGold(void);
 
 void timerCallback(TimerID timer);
 void keyboardCallback(KeyCode code, KeyState state);
@@ -123,6 +136,18 @@ void gameInit(void) {
 
 	locateObject(enemy, battleScene, enemyX, enemyY);
 	showObject(enemy);
+
+	// Gold
+	goldList[0] = createObject("./Images/Numbers/0_R.png");
+	goldList[1] = createObject("./Images/Numbers/1_R.png");
+	goldList[2] = createObject("./Images/Numbers/2_R.png");
+
+	for (int i = 0; i < 3; i++) {
+		scaleObject(goldList[i], 0.8f);
+		locateObject(goldList[i], battleScene, goldX[i], goldY);
+	}
+
+	showGold();
 }
 
 // ====================================================================================
@@ -227,7 +252,7 @@ void checkHp(int kind) {
 		hpPercent = static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp);
 		hpBar = enemyHpBar;
 	}
-	
+		
 	if (0.75f < hpPercent <= 1.0f) {
 		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_100%");
 	}
@@ -248,12 +273,68 @@ void checkHp(int kind) {
 	}
 }
 
+void showGold(void) {
+	// Shows a gold.
+
+	int temp = gold;
+	if (0 <= gold and gold < 10) {
+		for (int i = 0; i <= 0; i++) {
+			int num = temp % 10;
+			temp /= 10;
+
+			char imageName[30];
+			sprintf_s(imageName, sizeof(imageName), "./Images/Numbers/%d_R.png", num);
+			setObjectImage(goldList[i], imageName);
+			showObject(goldList[i]);
+		}
+
+		for (int i = 1; i <= 2; i++) {
+			hideObject(goldList[i]);
+		}
+	}
+	else if (10 <= gold and gold < 100) {
+		for (int i = 0; i <= 1; i++) {
+			int num = temp % 10;
+			temp /= 10;
+
+			char imageName[30];
+			sprintf_s(imageName, sizeof(imageName), "./Images/Numbers/%d_R.png", num);
+			setObjectImage(goldList[1-i], imageName);
+			showObject(goldList[1-i]);
+		}
+
+		for (int i = 2; i <= 2; i++) {
+			hideObject(goldList[i]);
+		}
+	}
+	else if (100 <= gold and gold < 1000) {
+		for (int i = 0; i <= 2; i++) {
+			int num = temp % 10;
+			temp /= 10;
+
+			char imageName[30];
+			sprintf_s(imageName, sizeof(imageName), "./Images/Numbers/%d_R.png", num);
+			setObjectImage(goldList[2-i], imageName);
+			showObject(goldList[2-i]);
+		}
+	}
+	else {
+		// Not implemented when gold >= 1000.
+		printf("showGold: Gold is over 999 \n");
+
+		for (int i = 0; i < 3; i++) {
+			setObjectImage(goldList[i], "./Images/Numbers/0_R.png");
+			showObject(goldList[i]);
+		}
+	}
+}
+
 // ====================================================================================
 
 void timerCallback(TimerID timer) {
 	// Processing an animation.
 
-	// If keyboard input, then player will move.
+	// If keyboard input, then player will move with moveTimer.
 	if (timer == moveTimer) {
 		if (currentScene == towerScene) {
 			playerMove();
