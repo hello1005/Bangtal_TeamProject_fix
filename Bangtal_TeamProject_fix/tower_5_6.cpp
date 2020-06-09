@@ -3,7 +3,7 @@
 
 // ====================================================================================
 
-// Preprocessor 
+// Preprocessor
 #include <bangtal.h>
 #include <stdio.h>
 
@@ -46,7 +46,7 @@ const int playerY_FIXED = 175;
 ObjectID playerIcon;
 ObjectID playerHpBar;
 int iconX, iconY;
-int dxIcon, dyIcon;
+int iconDx, iconDy;
 const int iconX_MIN = 333, iconX_MAX = 943, iconX_SIZE = 40;
 const int iconY_MIN = 150, iconY_MAX = 320, iconY_SIZE = 70;
 const int playerHpBarX_FIXED = 333, playerHpBarY_FIXED = 100;
@@ -181,6 +181,19 @@ void playerMove(void) {
 	else if (dx > 0) {
 		setObjectImage(player, "./Images/Characters/Warrior_R.png");
 	}
+
+	if (dx < -MOVE_SPEED) {
+		dx = -MOVE_SPEED;
+	}
+	else if (dx > MOVE_SPEED) {
+		dx = MOVE_SPEED;
+	}
+	if (dy < -MOVE_SPEED) {
+		dy = -MOVE_SPEED;
+	}
+	else if (dy > MOVE_SPEED) {
+		dy = MOVE_SPEED;
+	}
 	
 	// Set a restriction.
 	if (playerX < playerX_MIN) {
@@ -200,13 +213,23 @@ void playerIconMove(void) {
 	// Move a player-icon. (battleScene)
 
 	// Bug fix:
-	// Fixed a bug - Icon is going down automatically.
-	if (dyIcon > MOVE_SPEED) {
-		dyIcon = MOVE_SPEED;
+	// Fixed a bug.
+	if (iconDx < -MOVE_SPEED) {
+		iconDx = -MOVE_SPEED;
+	}
+	else if (iconDx > MOVE_SPEED) {
+		iconDx = MOVE_SPEED;
+	}
+	if (iconDy < -MOVE_SPEED) {
+		iconDy = -MOVE_SPEED;
+	}
+	else if (iconDy > MOVE_SPEED) {
+		iconDy = MOVE_SPEED;
 	}
 	
+	
 	// Set a restriction.
-	iconX += dxIcon;
+	iconX += iconDx;
 	if (iconX < iconX_MIN) {
 		iconX = iconX_MIN;
 	}
@@ -214,7 +237,7 @@ void playerIconMove(void) {
 		iconX = iconX_MAX;
 	}
 
-	iconY += dyIcon;
+	iconY += iconDy;
 	if (iconY < iconY_MIN) {
 		iconY = iconY_MIN;
 	}
@@ -233,17 +256,6 @@ void playerIconMove(void) {
 void battle(void) {
 	// Start a battle.
 	// When battle ends: Player selects avoid, Player died, Enemy died.
-
-	// 만약 '플레이어'의 턴이라면, Attack/Item/Avoid 버튼을 보여주고 턴을 쓰게 한다.
-	// 그 후, 턴을 PLAYER -> ENEMY로 바꾸고 turnTimer를 만들고 이용하여 setTimer(), startTimer()를 통해 타이머 콜백을 실행한다.
-	// 만약 '적'의 턴이라면, 적의 공격 패턴들을 구현한 후 하나를 실행한다. (랜덤이든, 확률을 설정하든 알아서)
-	// 그 후, 턴을 ENEMY -> PLAYER로 바꾸고 위와 동일한 방식으로 타이머 콜백을 실행한다.
-
-	// 만약 플레이어의 HP가 0이 될 경우 타이머 콜백을 실행하지 않고 다른 함수를 이용해 탑을 탈출.
-	// 만약 플레이어가 Avoid를 선택했을 경우 타이머 콜백을 실행하지 않고 전투를 탈출.
-	// 만약 적의 HP가 0이 될 경우 타이머 콜백을 실행하지 않고 Avoid 때와는 다른 함수를 이용해 승리.
-	
-	// turnTimer를 받은 타이머 콜백에서는 이 함수를 다시 실행한다.
 }
 
 bool checkCollision(int xStart, int xEnd, int yStart, int yEnd) {
@@ -417,7 +429,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 			dx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 		else if (currentScene == battleScene) {
-			dxIcon -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+			iconDx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 	}
 	// 83: Right arrow-key
@@ -426,7 +438,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 			dx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 		else if (currentScene == battleScene) {
-			dxIcon += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+			iconDx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 	}
 	// 84: Up arrow-key
@@ -438,14 +450,14 @@ void keyboardCallback(KeyCode code, KeyState state) {
 		}
 		// Else if current scene is battle, then player move to upper direction.
 		else if (currentScene == battleScene) {
-			dyIcon = MOVE_SPEED;
-			dyIcon += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+			iconDy = MOVE_SPEED;
+			iconDy += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 	}
 	// 85: Down arrow-key
 	else if (code == 85) {
 		if (currentScene == battleScene) {
-			dyIcon -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+			iconDy -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 	}
 }
