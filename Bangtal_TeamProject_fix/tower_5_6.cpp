@@ -14,13 +14,28 @@
 const bool DEBUGGING = true;
 
 // Enemy's attack
-class Attack {
+class Attack1 {
 public:
 	ObjectID obj;
 	int x, y, dy;
 
 public:
-	Attack(ObjectID obj, int x, int y, int dy) : obj(obj), x(x), y(y), dy(dy) {};
+	Attack1(ObjectID obj, int x, int y, int dy) : obj(obj), x(x), y(y), dy(dy) {};
+};
+
+class Attack2 {
+public:
+	ObjectID left, right;
+	ObjectID rect;
+	int left_x, right_x, rect_x, y;
+	int time;
+
+public:
+	Attack2(ObjectID left, ObjectID right, ObjectID rect, int y, int time) : left(left), right(right), rect(rect), y(y), time(time) {
+		left_x = 0;
+		right_x = 983;
+		rect_x = 333;
+	};
 };
 
 // Animation for character's movement
@@ -49,7 +64,7 @@ bool hitAlready = false;
 // Animation for enemy's attack
 TimerID enemyAtt1, enemyAtt2, enemyAtt3;
 const Second ATTACK_TICK = 0.05f;
-const int GRAVITY = 2;
+int GRAVITY = 2;
 
 // ====================================================================================
 
@@ -58,6 +73,10 @@ const int GRAVITY = 2;
 SceneID tower5F_Scene, battle5F_Scene;
 SceneID tower6F_Scene, game6F_Scene;
 SceneID currentScene;
+
+// Sounds
+SoundID hitSound;      // Player was hit.
+SoundID attackSound;   // Player attacked.
 
 // Player
 ObjectID player;
@@ -89,10 +108,14 @@ const int enemyHpBarX_FIXED = 333, enemyHpBarY_FIXED = 660;
 
 // Attack1
 int enemyAtt1Cnt = 0, enemyAtt1MaxCnt = 40;
+const int enemyAtt1StartCnt = 40;
 const int enemyAtt1Y_FIXED = 440;
 const int enemyAtt1X_SIZE = 34, enemyAtt1Y_SIZE = 30;
 
-std::vector<Attack> attacks;
+// Attack2
+int enemyAtt2Cnt = 0, enemyAtt2MaxCnt = 20;
+
+std::vector<Attack1> attacks1;
 
 // Gold
 int gold = 359;
@@ -141,6 +164,10 @@ void gameInit(void) {
 	enemyAtt1 = createTimer(ATTACK_TICK);
 	enemyAtt2 = createTimer(ATTACK_TICK);
 	enemyAtt3 = createTimer(ATTACK_TICK);
+
+	// Sounds
+	hitSound = createSound("./Sounds/HitSound.wav");
+	attackSound = createSound("./Sounds/AttackSound.wav");
 
 	// Scenes
 	tower5F_Scene = createScene("tower5F_Scene", "./Images/Backgrounds/Tower_Inside.png");
@@ -340,6 +367,16 @@ void enemyAttack(void) {
 }
 
 void enemyAttack1(void) {
+	if (0.5f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		enemyAtt1MaxCnt = enemyAtt1StartCnt;
+	}
+	else if (0.25f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		enemyAtt1MaxCnt = static_cast<int>(enemyAtt1StartCnt * 1.5f);
+	}
+	else {
+		enemyAtt1MaxCnt = enemyAtt1StartCnt * 2;
+	}
+
 	enemyAtt1Cnt = enemyAtt1MaxCnt;
 
 	setTimer(enemyAtt1, ATTACK_TICK);
@@ -397,6 +434,7 @@ void checkHp(int kind) {
 		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_10%.png");
 	}
 	else {
+		// HP is 0, so we have to do something at here.
 		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_0%.png");
 	}
 }
@@ -485,26 +523,36 @@ void timerCallback(TimerID timer) {
 	else if (timer == enemyAtt1) {
 		if (enemyAtt1Cnt > 0) {
 			srand((unsigned)time(NULL));
-			attacks.push_back(Attack(createObject("./Images/Enemies/Att1.png"), iconX, enemyAtt1Y_FIXED, 0));
+			attacks1.push_back(Attack1(createObject("./Images/Enemies/Att_Down.png"), iconX, enemyAtt1Y_FIXED, 0));
 
 			enemyAtt1Cnt -= 1;
 		}
 
 		int erased = 0;
 		for (int i = 0; i < (enemyAtt1MaxCnt - enemyAtt1Cnt); i++) {
-			attacks[i].dy -= GRAVITY;
-			attacks[i].y += attacks[i].dy;
+			if (0.5f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+				attacks1[i].dy -= GRAVITY;
+			}
+			else if (0.25f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+				attacks1[i].dy -= static_cast<int>(GRAVITY * 1.5f);
+			}
+			else {
+				attacks1[i].dy -= GRAVITY * 2;
+			}
 			
-			if (attacks[i].y < 100) {
-				hideObject(attacks[i].obj);
+			attacks1[i].y += attacks1[i].dy;
+			
+			if (attacks1[i].y < 100) {
+				hideObject(attacks1[i].obj);
 				erased += 1;
 			}
 			else {
-				locateObject(attacks[i].obj, battle5F_Scene, attacks[i].x, attacks[i].y);
-				showObject(attacks[i].obj);
+				locateObject(attacks1[i].obj, battle5F_Scene, attacks1[i].x, attacks1[i].y);
+				showObject(attacks1[i].obj);
 
-				if (checkCollision(playerIcon, attacks[i].x + 3, attacks[i].x + 3 + enemyAtt1X_SIZE, attacks[i].y, attacks[i].y + enemyAtt1Y_SIZE) and not hitAlready) {
+				if (checkCollision(playerIcon, attacks1[i].x + 3, attacks1[i].x + 3 + enemyAtt1X_SIZE, attacks1[i].y, attacks1[i].y + enemyAtt1Y_SIZE) and not hitAlready) {
 					playerHp -= 25;
+					playSound(hitSound);
 					checkHp(PLAYER);
 
 					hitAlready = true;
@@ -525,7 +573,7 @@ void timerCallback(TimerID timer) {
 				startTimer(enemyAtt1);
 			}
 			else {
-				attacks.clear();
+				attacks1.clear();
 			}
 		}
 	}
@@ -548,6 +596,7 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 	}
 	else if (object == attackButton) {
 		enemyHp -= 15;
+		playSound(attackSound);
 		checkHp(ENEMY);
 
 		hideObject(attackButton);
@@ -558,6 +607,22 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 		turnCnt = TURN_TIME;
 		setTimer(turnTimer, TURN_TICK);
 		startTimer(turnTimer);
+	}
+	else if (object == itemButton) {
+		// do something with item.
+	}
+	else if (object == avoidButton) {
+		enemyHp = enemyMaxHp;
+		enemyAtt1MaxCnt = 40;
+
+		checkHp(ENEMY);
+
+		hideObject(attackButton);
+		hideObject(itemButton);
+		hideObject(avoidButton);
+		
+		enterScene(tower5F_Scene);
+		currentScene = tower5F_Scene;
 	}
 }
 
@@ -588,6 +653,8 @@ void keyboardCallback(KeyCode code, KeyState state) {
 		if (currentScene == tower5F_Scene) {
 			currentScene = battle5F_Scene;
 			enterScene(currentScene);
+
+			battle();
 		}
 		// Else if current scene is battle, then player move to upper direction.
 		else if (currentScene == battle5F_Scene) {
