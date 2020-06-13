@@ -750,10 +750,7 @@ void timerCallback(TimerID timer) {
 }
 
 void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
-	if (object == enemy) {
-		enemyAttack1();
-	}
-	else if (object == attackButton) {
+	if (object == attackButton) {
 		enemyHp -= (playerAtk - enemyDef > 0 ? playerAtk - enemyDef : 1);
 		playSound(attackSound);
 		checkHp(ENEMY);
