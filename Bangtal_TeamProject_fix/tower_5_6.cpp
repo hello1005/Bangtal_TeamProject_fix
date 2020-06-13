@@ -202,7 +202,7 @@ void gameInit(void) {
 	playerHp = 100;
 	playerMaxHp = 100;
 	playerAtk = 35;
-	playerDef = 10;
+	playerDef = 5;
 
 	playerHpBar = createObject("./Images/UI/Battle/HP/Hp_100%.png");
 	locateObject(playerHpBar, battle5F_Scene, playerHpBarX_FIXED, playerHpBarY_FIXED);
