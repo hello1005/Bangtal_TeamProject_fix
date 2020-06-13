@@ -6,34 +6,57 @@
 // Preprocessor
 #include <bangtal.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <vector>
 
 // For debugging, set this variable true.
 const bool DEBUGGING = true;
 
+// Enemy's attack
+class Attack {
+public:
+	ObjectID obj;
+	int x, y, dy;
+
+public:
+	Attack(ObjectID obj, int x, int y, int dy) : obj(obj), x(x), y(y), dy(dy) {};
+};
+
 // Animation for character's movement
 TimerID moveTimer;
-const Second MOVE_TICK = 0.01f;
+const Second MOVE_TICK = 0.025f;
 const int MOVE_SPEED = 10;
-
-// Animation for immune state
-TimerID immuneTimer;
-const Second IMMUNE_TICK = 0.05f;
-const int IMMUNE_TIME = 20;
-
-// Animation for attack (Test)
-TimerID testAttackTimer;
-const Second TEST_TICK = 0.01f;
-const int GRAVITY = 1;
 
 // Const variable for turn
 const int PLAYER = 0;
 const int ENEMY = 1;
 
+// Animation for turn
+TimerID turnTimer;
+int turn = PLAYER;
+int turnCnt = 0;
+const int TURN_TIME = 20;
+const Second TURN_TICK = 0.05f;
+
+// Animation for immune state
+TimerID immuneTimer;
+int immuneCnt = 0;
+const Second IMMUNE_TICK = 0.05f;
+const int IMMUNE_TIME = 20;
+bool hitAlready = false;
+
+// Animation for enemy's attack
+TimerID enemyAtt1, enemyAtt2, enemyAtt3;
+const Second ATTACK_TICK = 0.05f;
+const int GRAVITY = 2;
+
 // ====================================================================================
 
 // Scenes and Objects
 // Scenes
-SceneID towerScene, battleScene;
+SceneID tower5F_Scene, battle5F_Scene;
+SceneID tower6F_Scene, game6F_Scene;
 SceneID currentScene;
 
 // Player
@@ -49,12 +72,14 @@ int iconX, iconY;
 int iconDx, iconDy;
 const int iconX_MIN = 333, iconX_MAX = 943, iconX_SIZE = 40;
 const int iconY_MIN = 150, iconY_MAX = 320, iconY_SIZE = 70;
-const int playerHpBarX_FIXED = 333, playerHpBarY_FIXED = 100;
+const int playerHpBarX_FIXED = 333, playerHpBarY_FIXED = 58;
 
 int playerHp, playerMaxHp, playerAtk, playerDef;
 
+ObjectID attackButton, itemButton, avoidButton;
+const int buttonY_FIXED = 80;
+
 // Enemy
-// enemyX: depending on size (500 ~ 600)
 ObjectID enemy;
 ObjectID enemyHpBar;
 int enemyX, enemyY;
@@ -62,12 +87,12 @@ int enemyHp, enemyMaxHp, enemyAtk, enemyDef;
 const int enemyY_FIXED = 410;
 const int enemyHpBarX_FIXED = 333, enemyHpBarY_FIXED = 660;
 
-ObjectID enemyTestAttack;
-int testAttackX = 550, testAttackY = 500;
-int dyTest = 0;
+// Attack1
+int enemyAtt1Cnt = 0, enemyAtt1MaxCnt = 40;
+const int enemyAtt1Y_FIXED = 440;
+const int enemyAtt1X_SIZE = 34, enemyAtt1Y_SIZE = 30;
 
-// Turn
-int turn = PLAYER;
+std::vector<Attack> attacks;
 
 // Gold
 int gold = 359;
@@ -84,10 +109,13 @@ void playerMove(void);
 void playerIconMove(void);
 
 void battle(void);
-bool checkCollision(int xStart, int xEnd, int yStart, int yEnd);
-void checkHp(int kind);
+void enemyAttack(void);
+void enemyAttack1(void);
+void enemyAttack2(void);
+void enemyAttack3(void);
 
-void testAttack(void);
+bool checkCollision(ObjectID object, int xStart, int xEnd, int yStart, int yEnd);
+void checkHp(int kind);
 
 void showGold(void);
 
@@ -100,18 +128,24 @@ void keyboardCallback(KeyCode code, KeyState state);
 // Implementations
 void gameInit(void) {
 	// Initialize a game with setting variable.
+	setGameOption(GameOption::GAME_OPTION_ROOM_TITLE, false);
+	setGameOption(GameOption::GAME_OPTION_MESSAGE_BOX_BUTTON, false);
 
 	// Timers for animation
 	moveTimer = createTimer(MOVE_TICK);
 	startTimer(moveTimer);
 
-	// Timers for attack (Test)
-	testAttackTimer = createTimer(TEST_TICK);
+	// Timers for turn, immune, and attacks
+	turnTimer = createTimer(TURN_TICK);
+	immuneTimer = createTimer(IMMUNE_TICK);
+	enemyAtt1 = createTimer(ATTACK_TICK);
+	enemyAtt2 = createTimer(ATTACK_TICK);
+	enemyAtt3 = createTimer(ATTACK_TICK);
 
 	// Scenes
-	towerScene = createScene("towerScene", "./Images/Backgrounds/Tower_Inside.png");
-	battleScene = createScene("battleScene", "./Images/Backgrounds/Battle.png");
-	currentScene = towerScene;
+	tower5F_Scene = createScene("tower5F_Scene", "./Images/Backgrounds/Tower_Inside.png");
+	battle5F_Scene = createScene("battle5F_Scene", "./Images/Backgrounds/Battle.png");
+	currentScene = tower5F_Scene;
 
 	// Player
 	player = createObject("./Images/Characters/Warrior_R.png");
@@ -124,7 +158,7 @@ void gameInit(void) {
 	playerIcon = createObject("./Images/Characters/Warrior_I.png");
 	iconX = 943;
 	iconY = 320;
-	locateObject(playerIcon, battleScene, iconX, iconY);
+	locateObject(playerIcon, battle5F_Scene, iconX, iconY);
 	showObject(playerIcon);
 
 	playerHp = 100;
@@ -133,24 +167,39 @@ void gameInit(void) {
 	playerDef = 3;
 
 	playerHpBar = createObject("./Images/UI/Battle/HP/Hp_100%.png");
-	locateObject(playerHpBar, battleScene, playerHpBarX_FIXED, playerHpBarY_FIXED);
+	locateObject(playerHpBar, battle5F_Scene, playerHpBarX_FIXED, playerHpBarY_FIXED);
 	showObject(playerHpBar);
 
+	attackButton = createObject("./Images/UI/Battle/attack.png");
+	locateObject(attackButton, battle5F_Scene, 310, buttonY_FIXED);
+	scaleObject(attackButton, 0.65f);
+	showObject(attackButton);
+
+	itemButton = createObject("./Images/UI/Battle/item.png");
+	locateObject(itemButton, battle5F_Scene, 610, buttonY_FIXED);
+	scaleObject(itemButton, 0.65f);
+	showObject(itemButton);
+
+	avoidButton = createObject("./Images/UI/Battle/avoid.png");
+	locateObject(avoidButton, battle5F_Scene, 890, buttonY_FIXED);
+	scaleObject(avoidButton, 0.65f);
+	showObject(avoidButton);
+
 	// Enemy
-	enemy = createObject("./Images/Enemies/TestEnemy.png");
-	enemyX = 530;
+	enemy = createObject("./Images/Enemies/BlackKnight.png");
+	enemyX = 590;
 	enemyY = enemyY_FIXED;
 	enemyHp = 50;
 	enemyMaxHp = 50;
 	enemyAtk = 10;
 	enemyDef = 3;
-
-	enemyHpBar = createObject("./Images/UI/Battle/Hp/Hp_10%.png");
-	locateObject(enemyHpBar, battleScene, enemyHpBarX_FIXED, enemyHpBarY_FIXED);
-	showObject(enemyHpBar);
-
-	locateObject(enemy, battleScene, enemyX, enemyY);
+	locateObject(enemy, battle5F_Scene, enemyX, enemyY);
+	scaleObject(enemy, 0.15f);
 	showObject(enemy);
+
+	enemyHpBar = createObject("./Images/UI/Battle/Hp/Hp_100%.png");
+	locateObject(enemyHpBar, battle5F_Scene, enemyHpBarX_FIXED, enemyHpBarY_FIXED);
+	showObject(enemyHpBar);
 
 	// Gold
 	goldList[0] = createObject("./Images/Numbers/0_R.png");
@@ -159,7 +208,7 @@ void gameInit(void) {
 
 	for (int i = 0; i < 3; i++) {
 		scaleObject(goldList[i], 0.8f);
-		locateObject(goldList[i], battleScene, goldX[i], goldY);
+		locateObject(goldList[i], battle5F_Scene, goldX[i], goldY);
 	}
 
 	showGold();
@@ -168,7 +217,7 @@ void gameInit(void) {
 // ====================================================================================
 
 void playerMove(void) {
-	// Move a player. (towerScene)
+	// Move a player. (tower5F_Scene)
 
 	playerX += dx;
 
@@ -210,7 +259,7 @@ void playerMove(void) {
 }
 
 void playerIconMove(void) {
-	// Move a player-icon. (battleScene)
+	// Move a player-icon. (battle5F_Scene)
 
 	// Bug fix:
 	// Fixed a bug.
@@ -226,7 +275,6 @@ void playerIconMove(void) {
 	else if (iconDy > MOVE_SPEED) {
 		iconDy = MOVE_SPEED;
 	}
-	
 	
 	// Set a restriction.
 	iconX += iconDx;
@@ -256,9 +304,49 @@ void playerIconMove(void) {
 void battle(void) {
 	// Start a battle.
 	// When battle ends: Player selects avoid, Player died, Enemy died.
+	if (turn == PLAYER) {
+		showObject(attackButton);
+		showObject(itemButton);
+		showObject(avoidButton);
+	}
+	else if (turn == ENEMY) {
+		enemyAttack();
+	}
 }
 
-bool checkCollision(int xStart, int xEnd, int yStart, int yEnd) {
+void enemyAttack(void) {
+	srand((unsigned)time(NULL));
+	
+	int strategy = rand() % 1 + 1;
+	switch (strategy) {
+	case 1:
+		enemyAttack1();
+
+		turn = PLAYER;
+		turnCnt = TURN_TIME * 5;
+		setTimer(turnTimer, TURN_TICK);
+		startTimer(turnTimer);
+		
+		break;
+	case 2:
+		// enemyAttack2();
+		break;
+	case 3:
+		// dd
+		break;
+	default:
+		break;
+	}
+}
+
+void enemyAttack1(void) {
+	enemyAtt1Cnt = enemyAtt1MaxCnt;
+
+	setTimer(enemyAtt1, ATTACK_TICK);
+	startTimer(enemyAtt1);
+}
+
+bool checkCollision(ObjectID object, int xStart, int xEnd, int yStart, int yEnd) {
 	// Check a collsion, then return a result.
 	
 	// About Collision:
@@ -271,10 +359,12 @@ bool checkCollision(int xStart, int xEnd, int yStart, int yEnd) {
 	// Conclusion:
 	// If a <= attack's range <= b, then player will be hit when (a - SIZE) < player's position < b
 	
-	bool xCollision = ((xStart - iconX_SIZE) < iconX) and (iconX < xEnd);
-	bool yCollision = ((yStart - iconY_SIZE) < iconY) and (iconY < yEnd);
+	if (object == playerIcon) {
+		bool xCollision = ((xStart - iconX_SIZE) < iconX) and (iconX < xEnd);
+		bool yCollision = ((yStart - iconY_SIZE) < iconY) and (iconY < yEnd);
 
-	return xCollision and yCollision;
+		return xCollision and yCollision;
+	}
 }
 
 void checkHp(int kind) {
@@ -290,42 +380,25 @@ void checkHp(int kind) {
 		hpPercent = static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp);
 		hpBar = enemyHpBar;
 	}
-		
-	if (0.75f < hpPercent <= 1.0f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_100%");
+	
+	if (0.75f < hpPercent and hpPercent <= 1.0f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_100%.png");
 	}
-	else if (0.5f < hpPercent <= 0.75f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_75%");
+	else if (0.5f < hpPercent and hpPercent <= 0.75f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_75%.png");
 	}
-	else if (0.25f < hpPercent <= 0.5f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_50%");
+	else if (0.25f < hpPercent and hpPercent <= 0.5f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_50%.png");
 	}
-	else if (0.1f < hpPercent <= 0.25f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_25%");
+	else if (0.1f < hpPercent and hpPercent <= 0.25f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_25%.png");
 	}
-	else if (0.0f < hpPercent <= 0.1f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_10%");
+	else if (0.0f < hpPercent and hpPercent <= 0.1f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_10%.png");
 	}
 	else {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_0%");
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_0%.png");
 	}
-}
-
-void testAttack(void) {
-	// Attack (test)
-
-	testAttackX = 550;
-	testAttackY = 500;
-	dyTest = 0;
-
-	enemyTestAttack = createObject("./Images/Enemies/TestAttack.png");
-	locateObject(enemyTestAttack, battleScene, testAttackX, testAttackY);
-	showObject(enemyTestAttack);
-
-	printf("testAttack() \n");
-
-	setTimer(testAttackTimer, TEST_TICK);
-	startTimer(testAttackTimer);
 }
 
 void showGold(void) {
@@ -391,32 +464,100 @@ void timerCallback(TimerID timer) {
 
 	// If keyboard input, then player will move with moveTimer.
 	if (timer == moveTimer) {
-		if (currentScene == towerScene) {
+		if (currentScene == tower5F_Scene) {
 			playerMove();
 		}
-		else if (currentScene == battleScene) {
+		else if (currentScene == battle5F_Scene) {
 			playerIconMove();
 		}
 	}
-	else if (timer == testAttackTimer) {
-		dyTest -= GRAVITY;
-		testAttackY += dyTest;
+	else if (timer == turnTimer) {
+		if (turnCnt > 0) {
+			turnCnt -= 1;
 
-		locateObject(enemyTestAttack, battleScene, testAttackX, testAttackY);
-
-		if (testAttackY < 50) {
-			hideObject(enemyTestAttack);
+			setTimer(turnTimer, TURN_TICK);
+			startTimer(turnTimer);
 		}
 		else {
-			setTimer(testAttackTimer, TEST_TICK);
-			startTimer(testAttackTimer);
+			battle();
+		}
+	}
+	else if (timer == enemyAtt1) {
+		if (enemyAtt1Cnt > 0) {
+			srand((unsigned)time(NULL));
+			attacks.push_back(Attack(createObject("./Images/Enemies/Att1.png"), iconX, enemyAtt1Y_FIXED, 0));
+
+			enemyAtt1Cnt -= 1;
+		}
+
+		int erased = 0;
+		for (int i = 0; i < (enemyAtt1MaxCnt - enemyAtt1Cnt); i++) {
+			attacks[i].dy -= GRAVITY;
+			attacks[i].y += attacks[i].dy;
+			
+			if (attacks[i].y < 100) {
+				hideObject(attacks[i].obj);
+				erased += 1;
+			}
+			else {
+				locateObject(attacks[i].obj, battle5F_Scene, attacks[i].x, attacks[i].y);
+				showObject(attacks[i].obj);
+
+				if (checkCollision(playerIcon, attacks[i].x + 3, attacks[i].x + 3 + enemyAtt1X_SIZE, attacks[i].y, attacks[i].y + enemyAtt1Y_SIZE) and not hitAlready) {
+					playerHp -= 25;
+					checkHp(PLAYER);
+
+					hitAlready = true;
+					immuneCnt = IMMUNE_TIME;
+					setTimer(immuneTimer, IMMUNE_TICK);
+					startTimer(immuneTimer);
+				}
+			}
+		}
+
+		if (enemyAtt1Cnt != 0) {
+			setTimer(enemyAtt1, ATTACK_TICK);
+			startTimer(enemyAtt1);
+		}
+		else {
+			if (erased != enemyAtt1MaxCnt) {
+				setTimer(enemyAtt1, ATTACK_TICK);
+				startTimer(enemyAtt1);
+			}
+			else {
+				attacks.clear();
+			}
+		}
+	}
+	else if (timer == immuneTimer) {
+		if (immuneCnt > 0) {
+			immuneCnt -= 1;
+
+			setTimer(immuneTimer, IMMUNE_TICK);
+			startTimer(immuneTimer);
+		}
+		else {
+			hitAlready = false;
 		}
 	}
 }
 
 void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 	if (object == enemy) {
-		testAttack();
+		enemyAttack1();
+	}
+	else if (object == attackButton) {
+		enemyHp -= 15;
+		checkHp(ENEMY);
+
+		hideObject(attackButton);
+		hideObject(itemButton);
+		hideObject(avoidButton);
+
+		turn = ENEMY;
+		turnCnt = TURN_TIME;
+		setTimer(turnTimer, TURN_TICK);
+		startTimer(turnTimer);
 	}
 }
 
@@ -425,38 +566,38 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 	// 82: Left arrow-key
 	if (code == 82) {
-		if (currentScene == towerScene) {
+		if (currentScene == tower5F_Scene) {
 			dx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
-		else if (currentScene == battleScene) {
+		else if (currentScene == battle5F_Scene) {
 			iconDx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 	}
 	// 83: Right arrow-key
 	else if (code == 83) {
-		if (currentScene == towerScene) {
+		if (currentScene == tower5F_Scene) {
 			dx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
-		else if (currentScene == battleScene) {
+		else if (currentScene == battle5F_Scene) {
 			iconDx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 	}
 	// 84: Up arrow-key
 	else if (code == 84) {
 		// If current scene is tower and player can battle, then change a scene.
-		if (currentScene == towerScene) {
-			currentScene = battleScene;
+		if (currentScene == tower5F_Scene) {
+			currentScene = battle5F_Scene;
 			enterScene(currentScene);
 		}
 		// Else if current scene is battle, then player move to upper direction.
-		else if (currentScene == battleScene) {
+		else if (currentScene == battle5F_Scene) {
 			iconDy = MOVE_SPEED;
 			iconDy += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 	}
 	// 85: Down arrow-key
 	else if (code == 85) {
-		if (currentScene == battleScene) {
+		if (currentScene == battle5F_Scene) {
 			iconDy -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 	}
