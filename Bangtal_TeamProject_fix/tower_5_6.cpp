@@ -29,12 +29,14 @@ public:
 	ObjectID rect;
 	int left_x, right_x, rect_x, y;
 	int time;
+	bool isRect;
 
 public:
 	Attack2(ObjectID left, ObjectID right, ObjectID rect, int y, int time) : left(left), right(right), rect(rect), y(y), time(time) {
-		left_x = 0;
-		right_x = 983;
+		left_x = 983;
+		right_x = 273;
 		rect_x = 333;
+		isRect = false;
 	};
 };
 
@@ -63,6 +65,7 @@ bool hitAlready = false;
 
 // Animation for enemy's attack
 TimerID enemyAtt1, enemyAtt2, enemyAtt3;
+TimerID enemyAtt2Maker;
 const Second ATTACK_TICK = 0.05f;
 int GRAVITY = 2;
 
@@ -113,9 +116,15 @@ const int enemyAtt1Y_FIXED = 440;
 const int enemyAtt1X_SIZE = 34, enemyAtt1Y_SIZE = 30;
 
 // Attack2
-int enemyAtt2Cnt = 0, enemyAtt2MaxCnt = 20;
+int enemyAtt2Cnt = 0, enemyAtt2MaxCnt = 10;
+const int enemyAtt2StartCnt = 10;
+const int enemyAtt2Time = 10;
+const int enemyAtt2X_SIZE = 650, enemyAtt2Y_SIZE = 34;
+int canMakeAtt2Cnt = 0;
+bool canMakeAtt2 = true;
 
 std::vector<Attack1> attacks1;
+std::vector<Attack2> attacks2;
 
 // Gold
 int gold = 359;
@@ -134,7 +143,7 @@ void playerIconMove(void);
 void battle(void);
 void enemyAttack(void);
 void enemyAttack1(void);
-void enemyAttack2(void);
+void enemyAttack2(bool half);
 void enemyAttack3(void);
 
 bool checkCollision(ObjectID object, int xStart, int xEnd, int yStart, int yEnd);
@@ -151,6 +160,7 @@ void keyboardCallback(KeyCode code, KeyState state);
 // Implementations
 void gameInit(void) {
 	// Initialize a game with setting variable.
+	srand((unsigned)time(NULL));
 	setGameOption(GameOption::GAME_OPTION_ROOM_TITLE, false);
 	setGameOption(GameOption::GAME_OPTION_MESSAGE_BOX_BUTTON, false);
 
@@ -164,6 +174,7 @@ void gameInit(void) {
 	enemyAtt1 = createTimer(ATTACK_TICK);
 	enemyAtt2 = createTimer(ATTACK_TICK);
 	enemyAtt3 = createTimer(ATTACK_TICK);
+	enemyAtt2Maker = createTimer(ATTACK_TICK);
 
 	// Sounds
 	hitSound = createSound("./Sounds/HitSound.wav");
@@ -177,37 +188,37 @@ void gameInit(void) {
 	// Player
 	player = createObject("./Images/Characters/Warrior_R.png");
 	scaleObject(player, 0.5f);
-	playerX = 1150;
+	playerX = 50;
 	playerY = playerY_FIXED;
 	locateObject(player, currentScene, playerX, playerY);
 	showObject(player);
 
 	playerIcon = createObject("./Images/Characters/Warrior_I.png");
-	iconX = 943;
-	iconY = 320;
+	iconX = 643;
+	iconY = 150;
 	locateObject(playerIcon, battle5F_Scene, iconX, iconY);
 	showObject(playerIcon);
 
 	playerHp = 100;
 	playerMaxHp = 100;
-	playerAtk = 20;
-	playerDef = 5;
+	playerAtk = 35;
+	playerDef = 10;
 
 	playerHpBar = createObject("./Images/UI/Battle/HP/Hp_100%.png");
 	locateObject(playerHpBar, battle5F_Scene, playerHpBarX_FIXED, playerHpBarY_FIXED);
 	showObject(playerHpBar);
 
-	attackButton = createObject("./Images/UI/Battle/attack.png");
+	attackButton = createObject("./Images/UI/Battle/Attack.png");
 	locateObject(attackButton, battle5F_Scene, 310, buttonY_FIXED);
 	scaleObject(attackButton, 0.65f);
 	showObject(attackButton);
 
-	itemButton = createObject("./Images/UI/Battle/item.png");
+	itemButton = createObject("./Images/UI/Battle/Item.png");
 	locateObject(itemButton, battle5F_Scene, 610, buttonY_FIXED);
 	scaleObject(itemButton, 0.65f);
 	showObject(itemButton);
 
-	avoidButton = createObject("./Images/UI/Battle/avoid.png");
+	avoidButton = createObject("./Images/UI/Battle/Avoid.png");
 	locateObject(avoidButton, battle5F_Scene, 890, buttonY_FIXED);
 	scaleObject(avoidButton, 0.65f);
 	showObject(avoidButton);
@@ -216,10 +227,10 @@ void gameInit(void) {
 	enemy = createObject("./Images/Enemies/BlackKnight.png");
 	enemyX = 590;
 	enemyY = enemyY_FIXED;
-	enemyHp = 50;
-	enemyMaxHp = 50;
-	enemyAtk = 30;
-	enemyDef = 5;
+	enemyHp = 200;
+	enemyMaxHp = 200;
+	enemyAtk = 20;
+	enemyDef = 10;
 	locateObject(enemy, battle5F_Scene, enemyX, enemyY);
 	scaleObject(enemy, 0.15f);
 	showObject(enemy);
@@ -342,27 +353,60 @@ void battle(void) {
 }
 
 void enemyAttack(void) {
-	srand((unsigned)time(NULL));
-	
-	int strategy = rand() % 1 + 1;
-	switch (strategy) {
-	case 1:
+	int a1_min = 0, a1_max = 0;
+	int a2_min = 0, a2_max = 0;
+	int a3_min = 0, a3_max = 0;
+	if (0.75f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		a1_min = 1;
+		a1_max = 50;
+		a2_min = 51;
+		a2_max = 100;
+	}
+	else if (0.5f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		a1_min = 1;
+		a1_max = 40;
+		a2_min = 41;
+		a2_max = 80;
+		a3_min = 81;
+		a3_max = 100;
+	}
+	else if (0.25f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		a1_min = 1;
+		a1_max = 30;
+		a2_min = 31;
+		a2_max = 60;
+		a3_min = 61;
+		a3_max = 100;
+	}
+	else {
+		a3_min = 1;
+		a3_max = 100;
+	}
+
+	int strategy = rand() % 100 + 1;
+	if (a1_min <= strategy and strategy <= a1_max) {
 		enemyAttack1();
 
 		turn = PLAYER;
 		turnCnt = TURN_TIME * 5;
 		setTimer(turnTimer, TURN_TICK);
 		startTimer(turnTimer);
-		
-		break;
-	case 2:
-		// enemyAttack2();
-		break;
-	case 3:
-		// dd
-		break;
-	default:
-		break;
+	}
+	else if (a2_min <= strategy and strategy <= a2_max) {
+		enemyAttack2(false);
+
+		turn = PLAYER;
+		turnCnt = TURN_TIME * 10;
+		setTimer(turnTimer, TURN_TICK);
+		startTimer(turnTimer);
+	}
+	else if (a3_min <= strategy and strategy <= a3_max) {
+		enemyAttack3();
+
+		turn = PLAYER;
+		turnCnt = TURN_TIME * 6;
+		setTimer(turnTimer, TURN_TICK);
+		startTimer(turnTimer);
 	}
 }
 
@@ -381,6 +425,25 @@ void enemyAttack1(void) {
 
 	setTimer(enemyAtt1, ATTACK_TICK);
 	startTimer(enemyAtt1);
+}
+
+void enemyAttack2(bool half) {
+	if (half) {
+		enemyAtt2MaxCnt = static_cast<int>(enemyAtt2StartCnt * 0.5f);
+	}
+	else {
+		enemyAtt2MaxCnt = enemyAtt2StartCnt;
+	}
+
+	enemyAtt2Cnt = enemyAtt2MaxCnt;
+
+	setTimer(enemyAtt2, ATTACK_TICK);
+	startTimer(enemyAtt2);
+}
+
+void enemyAttack3(void) {
+	enemyAttack1();
+	enemyAttack2(true);
 }
 
 bool checkCollision(ObjectID object, int xStart, int xEnd, int yStart, int yEnd) {
@@ -434,7 +497,6 @@ void checkHp(int kind) {
 		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_10%.png");
 	}
 	else {
-		// HP is 0, so we have to do something at here.
 		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_0%.png");
 	}
 }
@@ -522,7 +584,6 @@ void timerCallback(TimerID timer) {
 	}
 	else if (timer == enemyAtt1) {
 		if (enemyAtt1Cnt > 0) {
-			srand((unsigned)time(NULL));
 			attacks1.push_back(Attack1(createObject("./Images/Enemies/Att_Down.png"), iconX, enemyAtt1Y_FIXED, 0));
 
 			enemyAtt1Cnt -= 1;
@@ -556,7 +617,8 @@ void timerCallback(TimerID timer) {
 					checkHp(PLAYER);
 
 					if (playerHp <= 0) {
-						// Player died
+						// Player died (Not Implemented)
+						
 					}
 
 					hitAlready = true;
@@ -579,6 +641,99 @@ void timerCallback(TimerID timer) {
 			else {
 				attacks1.clear();
 			}
+		}
+	}
+	else if (timer == enemyAtt2) {
+		if (enemyAtt2Cnt > 0 and canMakeAtt2) {
+			ObjectID left = createObject("./Images/Enemies/Att_Left.png");
+			ObjectID right = createObject("./Images/Enemies/Att_Right.png");
+			ObjectID rect = createObject("./Images/Enemies/Att_Rect.png");
+
+			attacks2.push_back(Attack2(left, right, rect, iconY + 15, enemyAtt2Time));
+			enemyAtt2Cnt -= 1;
+
+			canMakeAtt2 = false;
+			if (static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp) < 0.5f) {
+				canMakeAtt2Cnt = static_cast<int>(enemyAtt2Time * 1.2f);
+			}
+			else {
+				canMakeAtt2Cnt = static_cast<int>(enemyAtt2Time * 1.5f);
+			}
+			setTimer(enemyAtt2Maker, ATTACK_TICK);
+			startTimer(enemyAtt2Maker);
+		}
+
+		int erased = 0;
+		for (int i = 0; i < (enemyAtt2MaxCnt - enemyAtt2Cnt); i++) {
+			if (not attacks2[i].isRect) {
+				locateObject(attacks2[i].left, battle5F_Scene, attacks2[i].left_x, attacks2[i].y);
+				locateObject(attacks2[i].right, battle5F_Scene, attacks2[i].right_x, attacks2[i].y);
+				showObject(attacks2[i].left);
+				showObject(attacks2[i].right);
+
+				if (attacks2[i].time >= 0) {
+					attacks2[i].time -= 1;
+				}
+				else {
+					attacks2[i].time = enemyAtt2Time;
+					attacks2[i].isRect = true;
+				}
+			}
+			else {
+				locateObject(attacks2[i].rect, battle5F_Scene, attacks2[i].rect_x, attacks2[i].y);
+				showObject(attacks2[i].rect);
+				hideObject(attacks2[i].left);
+				hideObject(attacks2[i].right);
+
+				if (attacks2[i].time >= 0) {
+					attacks2[i].time -= 1;
+
+					if (checkCollision(playerIcon, attacks2[i].rect_x, attacks2[i].rect_x + enemyAtt2X_SIZE, attacks2[i].y, attacks2[i].y + enemyAtt2Y_SIZE) and not hitAlready) {
+						playerHp -= (enemyAtk - playerDef > 0 ? enemyAtk - playerDef : 1);
+						playSound(hitSound);
+						checkHp(PLAYER);
+
+						if (playerHp <= 0) {
+							// Player died (Not Implemented)
+							
+						}
+
+						hitAlready = true;
+						immuneCnt = IMMUNE_TIME;
+						setTimer(immuneTimer, IMMUNE_TICK);
+						startTimer(immuneTimer);
+					}
+				}
+				else {
+					hideObject(attacks2[i].rect);
+					erased += 1;
+				}
+			}
+		}
+
+		if (enemyAtt2Cnt != 0) {
+			setTimer(enemyAtt2, ATTACK_TICK);
+			startTimer(enemyAtt2);
+		}
+		else {
+			if (erased != enemyAtt2MaxCnt) {
+				setTimer(enemyAtt2, ATTACK_TICK);
+				startTimer(enemyAtt2);
+			}
+			else {
+				attacks2.clear();
+			}
+		}
+	}
+	else if (timer == enemyAtt2Maker) {
+		if (canMakeAtt2Cnt > 0) {
+			canMakeAtt2Cnt -= 1;
+
+			setTimer(enemyAtt2Maker, ATTACK_TICK);
+			startTimer(enemyAtt2Maker);
+		}
+		else {
+			canMakeAtt2 = true;
 		}
 	}
 	else if (timer == immuneTimer) {
