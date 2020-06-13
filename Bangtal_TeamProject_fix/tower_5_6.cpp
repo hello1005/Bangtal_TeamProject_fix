@@ -190,8 +190,8 @@ void gameInit(void) {
 
 	playerHp = 100;
 	playerMaxHp = 100;
-	playerAtk = 5;
-	playerDef = 3;
+	playerAtk = 20;
+	playerDef = 5;
 
 	playerHpBar = createObject("./Images/UI/Battle/HP/Hp_100%.png");
 	locateObject(playerHpBar, battle5F_Scene, playerHpBarX_FIXED, playerHpBarY_FIXED);
@@ -218,8 +218,8 @@ void gameInit(void) {
 	enemyY = enemyY_FIXED;
 	enemyHp = 50;
 	enemyMaxHp = 50;
-	enemyAtk = 10;
-	enemyDef = 3;
+	enemyAtk = 30;
+	enemyDef = 5;
 	locateObject(enemy, battle5F_Scene, enemyX, enemyY);
 	scaleObject(enemy, 0.15f);
 	showObject(enemy);
@@ -551,9 +551,13 @@ void timerCallback(TimerID timer) {
 				showObject(attacks1[i].obj);
 
 				if (checkCollision(playerIcon, attacks1[i].x + 3, attacks1[i].x + 3 + enemyAtt1X_SIZE, attacks1[i].y, attacks1[i].y + enemyAtt1Y_SIZE) and not hitAlready) {
-					playerHp -= 25;
+					playerHp -= (enemyAtk - playerDef > 0 ? enemyAtk - playerDef : 1);
 					playSound(hitSound);
 					checkHp(PLAYER);
+
+					if (playerHp <= 0) {
+						// Player died
+					}
 
 					hitAlready = true;
 					immuneCnt = IMMUNE_TIME;
@@ -595,9 +599,13 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 		enemyAttack1();
 	}
 	else if (object == attackButton) {
-		enemyHp -= 15;
+		enemyHp -= (playerAtk - enemyDef > 0 ? playerAtk - enemyDef : 1);
 		playSound(attackSound);
 		checkHp(ENEMY);
+
+		if (enemyHp <= 0) {
+			// Enemy died
+		}
 
 		hideObject(attackButton);
 		hideObject(itemButton);
@@ -613,7 +621,6 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 	}
 	else if (object == avoidButton) {
 		enemyHp = enemyMaxHp;
-		enemyAtt1MaxCnt = 40;
 
 		checkHp(ENEMY);
 
