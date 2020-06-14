@@ -250,10 +250,9 @@ void gameInit(void) {
 	battle5F_Scene = createScene("Black Knight", "./Images/Backgrounds/Battle.png");
 	tower6F_Scene = createScene("Tower - 6F", "./Images/Backgrounds/Tower_Inside.png");
 	game6F_Scene = createScene("Puzzle", "./Images/Backgrounds/Puzzle_6F.png");
-	currentScene = tower6F_Scene;
+	currentScene = tower5F_Scene;
 
 	// Buttons
-
 	attackButton = createObject("./Images/UI/Battle/Attack.png");
 	locateObject(attackButton, battle5F_Scene, 310, buttonY_FIXED);
 	scaleObject(attackButton, 0.65f);
@@ -299,7 +298,7 @@ void gameInit(void) {
 	locateObject(puzzleT, tower6F_Scene, puzzleTX_FIXED, puzzleTY_FIXED);
 	showObject(puzzleT);
 
-	// Player
+	// Player (Def is 20 for testing)
 	player = createObject("./Images/Characters/Warrior_R.png");
 	scaleObject(player, 0.5f);
 	playerX = 750;
@@ -315,8 +314,8 @@ void gameInit(void) {
 
 	playerHp = 100;
 	playerMaxHp = 100;
-	playerAtk = 350;
-	playerDef = 5;
+	playerAtk = 35;
+	playerDef = 20;
 
 	playerHpBar = createObject("./Images/UI/Battle/HP/Hp_100%.png");
 	locateObject(playerHpBar, battle5F_Scene, playerHpBarX_FIXED, playerHpBarY_FIXED);
