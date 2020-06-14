@@ -75,10 +75,18 @@ int messageCnt = 0;
 const int MESSAGE_TIME = 1;
 const Second MESSAGE_TICK = 1.0f;
 
+// Animation for game over
+TimerID gameOverTimer;
+int overCnt = 0;
+const int OVER_TIME = 1;
+const Second OVER_TICK = 1.0f;
+
 // ====================================================================================
 
 // Scenes and Objects
 // Scenes
+SceneID gameOverScene;
+SceneID villageLeftScene;
 SceneID tower5F_Scene, battle5F_Scene;
 SceneID tower6F_Scene, game6F_Scene;
 SceneID currentScene;
@@ -86,6 +94,15 @@ SceneID currentScene;
 // Sounds
 SoundID hitSound;      // Player was hit.
 SoundID attackSound;   // Player attacked.
+
+// Days
+int day = 1;
+const int DAY_LIMIT = 14;
+bool isNight = false;
+
+// Structures and messages
+ObjectID house;
+ObjectID messageObj;
 
 // Player
 ObjectID player;
@@ -201,6 +218,9 @@ void gameInit(void);
 void playerMove(void);
 void playerIconMove(void);
 
+void changeToNight(void);
+void rest(void);
+
 void battle(void);
 void enemyAttack(void);
 void enemyAttack1(void);
@@ -240,6 +260,8 @@ void gameInit(void) {
 	enemyAtt2 = createTimer(ATTACK_TICK);
 	enemyAtt3 = createTimer(ATTACK_TICK);
 	enemyAtt2Maker = createTimer(ATTACK_TICK);
+	messageTimer = createTimer(MESSAGE_TICK);
+	gameOverTimer = createTimer(OVER_TICK);
 
 	// Sounds
 	hitSound = createSound("./Sounds/HitSound.wav");
@@ -250,7 +272,13 @@ void gameInit(void) {
 	battle5F_Scene = createScene("Black Knight", "./Images/Backgrounds/Battle.png");
 	tower6F_Scene = createScene("Tower - 6F", "./Images/Backgrounds/Tower_Inside.png");
 	game6F_Scene = createScene("Puzzle", "./Images/Backgrounds/Puzzle_6F.png");
+	villageLeftScene = createScene("Village", "./Images/Backgrounds/DayTime.png");
 	currentScene = tower5F_Scene;
+
+	// Structures
+	house = createObject("./Images/Structures/House.png");
+	locateObject(house, villageLeftScene, 750, 195);
+	showObject(house);
 
 	// Buttons
 	attackButton = createObject("./Images/UI/Battle/Attack.png");
@@ -417,6 +445,53 @@ void playerIconMove(void) {
 
 	setTimer(moveTimer, MOVE_TICK);
 	startTimer(moveTimer);
+}
+
+// ====================================================================================
+
+void changeToNight(void) {
+	// Change a time to night.
+
+	if (not isNight) {
+		isNight = true;
+		setSceneImage(villageLeftScene, "./Images/Backgrounds/NightTime.png");
+		// setSceneImage(villageRightScene, "./Images/Backgrounds/NightTime.png");
+	}
+}
+
+void rest(void) {
+	// Change a day to tomorrow.
+
+	if (isNight) {
+		if (day < DAY_LIMIT) {
+			playerHp = playerMaxHp;
+			day += 1;
+
+			setSceneImage(villageLeftScene, "./Images/Backgrounds/DayTime.png");
+			// setSceneImage(villageRightScene, "./Images/Backgrounds/DayTime.png");
+			isNight = false;
+		}
+		else {
+			// At DAY_LIMIT, enter scene to game over.
+			// gameOverScene = createScene("game over", "./Images/Backgrounds/GameOver.jpg");
+			// enterScene(gameOverScene);
+			// overCnt = OVER_TIME;
+			// setTimer(gameOverTimer, OVER_TICK);
+			// startTimer(gameOverTimer);
+		}
+	}
+	else {
+		// If time is not a night, show message about using house.
+		ObjectID canNotRest = createObject("./Images/Messages/CanNotRest.png");
+		locateObject(canNotRest, villageLeftScene, 0, 0);
+		showObject(canNotRest);
+
+		// Using animations.
+		messageCnt = MESSAGE_TIME;
+		messageObj = canNotRest;
+		setTimer(messageTimer, MESSAGE_TICK);
+		startTimer(messageTimer);
+	}
 }
 
 // ====================================================================================
@@ -766,6 +841,27 @@ void timerCallback(TimerID timer) {
 			startTimer(moveTimer);
 		}
 	}
+	else if (timer == messageTimer) {
+		if (messageCnt > 0) {
+			messageCnt -= 1;
+
+			if (messageCnt == 0) {
+				hideObject(messageObj);
+			}
+
+			startTimer(messageTimer);
+			setTimer(messageTimer, MESSAGE_TICK);
+		}
+	}
+	else if (timer == gameOverTimer) {
+		if (overCnt > 0) {
+			overCnt -= 1;
+
+			if (overCnt == 0) {
+				endGame();
+			}
+		}
+	}
 	else if (timer == turnTimer) {
 		if (turnCnt > 0) {
 			turnCnt -= 1;
@@ -1055,8 +1151,13 @@ void keyboardCallback(KeyCode code, KeyState state) {
 	// 84: Up arrow-key
 	else if (code == 84) {
 		// If current scene is tower and player can battle, then change a scene.
-		if (currentScene == tower5F_Scene) {
-			if (enemyTX_FIXED - 30 < playerX and playerX < enemyTX_FIXED + 100) {
+		if (currentScene == villageLeftScene) {
+			if (750 <= playerX and playerX <= 1050) {
+				rest();
+			}
+		}
+		else if (currentScene == tower5F_Scene) {
+			if (enemyTX_FIXED - 30 < playerX and playerX < enemyTX_FIXED + 100 and enemyTShown) {
 				currentScene = battle5F_Scene;
 				enterScene(currentScene);
 
@@ -1081,7 +1182,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 			iconDy += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 		else if (currentScene == tower6F_Scene) {
-			if (puzzleTX_FIXED - 30 < playerX and playerX < puzzleTX_FIXED + 200 and puzzleTShown) {
+			if (puzzleTX_FIXED - 30 < playerX and playerX < puzzleTX_FIXED + 300 and puzzleTShown) {
 				currentScene = game6F_Scene;
 				enterScene(currentScene);
 
@@ -1089,8 +1190,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 				puzzleInit();
 			}
-			else if (puzzleTX_FIXED - 30 < playerX and playerX < puzzleTX_FIXED + 200 and not puzzleTShown) {
-				printf("keyboardCallback: Go to Floor 7 \n");
+			else if (puzzleTX_FIXED - 30 < playerX and playerX < puzzleTX_FIXED + 300 and not puzzleTShown) {
 				// currentScene = tower7F_Scene;
 
 				// playerX = 50;
