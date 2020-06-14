@@ -69,6 +69,12 @@ TimerID enemyAtt2Maker;
 const Second ATTACK_TICK = 0.05f;
 int GRAVITY = 2;
 
+// Animation for message
+TimerID messageTimer;
+int messageCnt = 0;
+const int MESSAGE_TIME = 1;
+const Second MESSAGE_TICK = 1.0f;
+
 // ====================================================================================
 
 // Scenes and Objects
@@ -98,15 +104,20 @@ const int playerHpBarX_FIXED = 333, playerHpBarY_FIXED = 58;
 
 int playerHp, playerMaxHp, playerAtk, playerDef;
 
+// Buttons
 ObjectID attackButton, itemButton, avoidButton;
+ObjectID outButton;
 const int buttonY_FIXED = 80;
 
 // Enemy
 ObjectID enemy;
+ObjectID enemyT;
 ObjectID enemyHpBar;
 int enemyX, enemyY;
 int enemyHp, enemyMaxHp, enemyAtk, enemyDef;
+bool enemyTShown = true;
 const int enemyY_FIXED = 410;
+const int enemyTX_FIXED = 850, enemyTY_FIXED = 200;
 const int enemyHpBarX_FIXED = 333, enemyHpBarY_FIXED = 660;
 
 // Attack1
@@ -132,6 +143,56 @@ ObjectID goldList[3];
 int goldX[3] = { 1040, 1067, 1094 };
 int goldY = 595;
 
+// Puzzle
+const int emptyNum = 4;
+
+class Puzzle {
+public:
+	ObjectID obj;
+	int x, y, num;
+
+public:
+	Puzzle() : x(0), y(0), num(0) {
+		obj = createObject("nothing");
+	}
+	Puzzle(int num, int x, int y) : x(x), y(y), num(num) {
+		char imageName[60];
+		sprintf_s(imageName, sizeof(imageName), "./Images/UI/Puzzle/Partitions2/%d.png", num);
+		obj = createObject(imageName);
+
+		locateObject(obj, game6F_Scene, x, y);
+	};
+
+public:
+	void changeImage(int num) {
+		this->num = num;
+
+		char imageName[60];
+		sprintf_s(imageName, sizeof(imageName), "./Images/UI/Puzzle/Partitions2/%d.png", num);
+		setObjectImage(this->obj, imageName);
+
+		if (this->num == emptyNum) {
+			hideObject(this->obj);
+		}
+		else {
+			showObject(this->obj);
+		}
+	}
+	void changeLocation(int x, int y) {
+		this->x = x;
+		this->y = y;
+		
+		locateObject(this->obj, game6F_Scene, this->x, this->y);
+	}
+};
+
+int puzzleX[3] = { 375, 552, 729 };
+int puzzleY[3] = { 447, 270, 93 };
+Puzzle puzzleList[3][3];
+ObjectID puzzleT;
+bool puzzleTShown = true;
+const int puzzleTX_FIXED = 760, puzzleTY_FIXED = 200;
+
 // ====================================================================================
 
 // Functions
@@ -148,8 +209,12 @@ void enemyAttack3(void);
 
 bool checkCollision(ObjectID object, int xStart, int xEnd, int yStart, int yEnd);
 void checkHp(int kind);
-
 void showGold(void);
+
+void puzzleInit(void);
+bool isEnd(void);
+void isTouching(int x, int y);
+void puzzleEnd(void);
 
 void timerCallback(TimerID timer);
 void mouseCallback(ObjectID object, int x, int y, MouseAction action);
@@ -161,7 +226,7 @@ void keyboardCallback(KeyCode code, KeyState state);
 void gameInit(void) {
 	// Initialize a game with setting variable.
 	srand((unsigned)time(NULL));
-	setGameOption(GameOption::GAME_OPTION_ROOM_TITLE, false);
+	// setGameOption(GameOption::GAME_OPTION_ROOM_TITLE, false);
 	setGameOption(GameOption::GAME_OPTION_MESSAGE_BOX_BUTTON, false);
 
 	// Timers for animation
@@ -181,32 +246,13 @@ void gameInit(void) {
 	attackSound = createSound("./Sounds/AttackSound.wav");
 
 	// Scenes
-	tower5F_Scene = createScene("tower5F_Scene", "./Images/Backgrounds/Tower_Inside.png");
-	battle5F_Scene = createScene("battle5F_Scene", "./Images/Backgrounds/Battle.png");
-	currentScene = tower5F_Scene;
+	tower5F_Scene = createScene("Tower - 5F", "./Images/Backgrounds/Tower_Inside.png");
+	battle5F_Scene = createScene("Black Knight", "./Images/Backgrounds/Battle.png");
+	tower6F_Scene = createScene("Tower - 6F", "./Images/Backgrounds/Tower_Inside.png");
+	game6F_Scene = createScene("Puzzle", "./Images/Backgrounds/Puzzle_6F.png");
+	currentScene = tower6F_Scene;
 
-	// Player
-	player = createObject("./Images/Characters/Warrior_R.png");
-	scaleObject(player, 0.5f);
-	playerX = 50;
-	playerY = playerY_FIXED;
-	locateObject(player, currentScene, playerX, playerY);
-	showObject(player);
-
-	playerIcon = createObject("./Images/Characters/Warrior_I.png");
-	iconX = 643;
-	iconY = 150;
-	locateObject(playerIcon, battle5F_Scene, iconX, iconY);
-	showObject(playerIcon);
-
-	playerHp = 100;
-	playerMaxHp = 100;
-	playerAtk = 35;
-	playerDef = 5;
-
-	playerHpBar = createObject("./Images/UI/Battle/HP/Hp_100%.png");
-	locateObject(playerHpBar, battle5F_Scene, playerHpBarX_FIXED, playerHpBarY_FIXED);
-	showObject(playerHpBar);
+	// Buttons
 
 	attackButton = createObject("./Images/UI/Battle/Attack.png");
 	locateObject(attackButton, battle5F_Scene, 310, buttonY_FIXED);
@@ -223,6 +269,10 @@ void gameInit(void) {
 	scaleObject(avoidButton, 0.65f);
 	showObject(avoidButton);
 
+	outButton = createObject("./Images/UI/Puzzle/OutButton.png");
+	locateObject(outButton, game6F_Scene, puzzleX[2] + 187, puzzleY[2] - 5);
+	showObject(outButton);
+
 	// Enemy
 	enemy = createObject("./Images/Enemies/BlackKnight.png");
 	enemyX = 590;
@@ -235,9 +285,42 @@ void gameInit(void) {
 	scaleObject(enemy, 0.15f);
 	showObject(enemy);
 
+	enemyT = createObject("./Images/Enemies/BlackKnight.png");
+	locateObject(enemyT, tower5F_Scene, enemyTX_FIXED, enemyTY_FIXED);
+	scaleObject(enemyT, 0.22f);
+	showObject(enemyT);
+
 	enemyHpBar = createObject("./Images/UI/Battle/Hp/Hp_100%.png");
 	locateObject(enemyHpBar, battle5F_Scene, enemyHpBarX_FIXED, enemyHpBarY_FIXED);
 	showObject(enemyHpBar);
+
+	// Puzzle
+	puzzleT = createObject("./Images/UI/Puzzle/DoorT.png");
+	locateObject(puzzleT, tower6F_Scene, puzzleTX_FIXED, puzzleTY_FIXED);
+	showObject(puzzleT);
+
+	// Player
+	player = createObject("./Images/Characters/Warrior_R.png");
+	scaleObject(player, 0.5f);
+	playerX = 750;
+	playerY = playerY_FIXED;
+	locateObject(player, currentScene, playerX, playerY);
+	showObject(player);
+
+	playerIcon = createObject("./Images/Characters/Warrior_I.png");
+	iconX = 643;
+	iconY = 150;
+	locateObject(playerIcon, battle5F_Scene, iconX, iconY);
+	showObject(playerIcon);
+
+	playerHp = 100;
+	playerMaxHp = 100;
+	playerAtk = 350;
+	playerDef = 5;
+
+	playerHpBar = createObject("./Images/UI/Battle/HP/Hp_100%.png");
+	locateObject(playerHpBar, battle5F_Scene, playerHpBarX_FIXED, playerHpBarY_FIXED);
+	showObject(playerHpBar);
 
 	// Gold
 	goldList[0] = createObject("./Images/Numbers/0_R.png");
@@ -255,7 +338,7 @@ void gameInit(void) {
 // ====================================================================================
 
 void playerMove(void) {
-	// Move a player. (tower5F_Scene)
+	// Move a player. (tower5F_Scene, tower6F_Scene)
 
 	playerX += dx;
 
@@ -559,16 +642,129 @@ void showGold(void) {
 
 // ====================================================================================
 
+void puzzleInit(void) {
+	Puzzle puzzleTempList[9];
+	for (int i = 0; i < 9; i++) {
+		puzzleTempList[i] = Puzzle(i, puzzleX[i % 3], puzzleY[i / 3]);
+		if (i == emptyNum) {
+			hideObject(puzzleTempList[i].obj);
+		}
+		else {
+			showObject(puzzleTempList[i].obj);
+		}
+	}
+	
+	bool already[9] = { false };
+	int puzzleRandomNum[9] = { 0 };
+	int index = 0;
+	while (index != 9) {
+		int temp = rand() % 9;
+
+		if (!already[temp]) {
+			puzzleRandomNum[index++] = temp;
+			already[temp] = true;
+		}
+	}
+	index = 0;
+	
+	/*
+	// Use it for check answer.
+	// If you want to use it, you have to comment up-lines (bool already ~ index = 0;)
+	int puzzleRandomNum[9] = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+	int index = 0;
+	*/
+	
+	for (int y = 0; y < 3; y++) {
+		for (int x = 0; x < 3; x++) {
+			puzzleList[y][x] = puzzleTempList[puzzleRandomNum[index++]];
+			puzzleList[y][x].changeLocation(puzzleX[x], puzzleY[y]);
+		}
+	}
+}
+
+bool isEnd(void) {
+	int index = 0;
+
+	for (int y = 0; y < 3; y++) {
+		for (int x = 0; x < 3; x++) {
+			if (puzzleList[y][x].num == index) index += 1;
+			else return false;
+		}
+	}
+	return true;
+}
+
+void isTouching(int x, int y) {
+	if (puzzleList[y][x].num == emptyNum) {
+		return;
+	}
+
+	if (0 <= x - 1) {
+		if (puzzleList[y][x - 1].num == emptyNum) {
+			puzzleList[y][x - 1].changeImage(puzzleList[y][x].num);
+			puzzleList[y][x].changeImage(emptyNum);
+
+			if (isEnd()) {
+				puzzleEnd();
+			}
+		}
+	}
+	if (x + 1 <= 2) {
+		if (puzzleList[y][x + 1].num == emptyNum) {
+			puzzleList[y][x + 1].changeImage(puzzleList[y][x].num);
+			puzzleList[y][x].changeImage(emptyNum);
+
+			if (isEnd()) {
+				puzzleEnd();
+			}
+		}
+	}
+	if (0 <= y - 1) {
+		if (puzzleList[y - 1][x].num == emptyNum) {
+			puzzleList[y - 1][x].changeImage(puzzleList[y][x].num);
+			puzzleList[y][x].changeImage(emptyNum);
+
+			if (isEnd()) {
+				puzzleEnd();
+			}
+		}
+	}
+	if (y + 1 <= 2) {
+		if (puzzleList[y + 1][x].num == emptyNum) {
+			puzzleList[y + 1][x].changeImage(puzzleList[y][x].num);
+			puzzleList[y][x].changeImage(emptyNum);
+
+			if (isEnd()) {
+				puzzleEnd();
+			}
+		}
+	}
+}
+
+void puzzleEnd(void) {
+	setObjectImage(puzzleT, "./Images/UI/Puzzle/DoorT_Open.png");
+	puzzleTShown = false;
+
+	currentScene = tower6F_Scene;
+	enterScene(currentScene);
+}
+
+// ====================================================================================
+
 void timerCallback(TimerID timer) {
 	// Processing an animation.
 
 	// If keyboard input, then player will move with moveTimer.
 	if (timer == moveTimer) {
-		if (currentScene == tower5F_Scene) {
+		if (currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
 			playerMove();
 		}
 		else if (currentScene == battle5F_Scene) {
 			playerIconMove();
+		}
+		else if (currentScene == game6F_Scene) {
+			setTimer(moveTimer, MOVE_TICK);
+			startTimer(moveTimer);
 		}
 	}
 	else if (timer == turnTimer) {
@@ -755,33 +951,84 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 		playSound(attackSound);
 		checkHp(ENEMY);
 
-		if (enemyHp <= 0) {
-			// Enemy died
-		}
-
 		hideObject(attackButton);
 		hideObject(itemButton);
 		hideObject(avoidButton);
 
-		turn = ENEMY;
-		turnCnt = TURN_TIME;
-		setTimer(turnTimer, TURN_TICK);
-		startTimer(turnTimer);
+		if (enemyHp <= 0 and currentScene == battle5F_Scene) {
+			enemyTShown = false;
+			hideObject(enemyT);
+
+			currentScene = tower5F_Scene;
+			enterScene(tower5F_Scene);
+		}
+		else {
+			turn = ENEMY;
+			turnCnt = TURN_TIME;
+			setTimer(turnTimer, TURN_TICK);
+			startTimer(turnTimer);
+		}
 	}
 	else if (object == itemButton) {
 		// do something with item.
 	}
 	else if (object == avoidButton) {
 		enemyHp = enemyMaxHp;
-
 		checkHp(ENEMY);
 
 		hideObject(attackButton);
 		hideObject(itemButton);
 		hideObject(avoidButton);
 		
-		enterScene(tower5F_Scene);
-		currentScene = tower5F_Scene;
+		if (currentScene == battle5F_Scene) {
+			enterScene(tower5F_Scene);
+			currentScene = tower5F_Scene;
+		}
+	}
+
+	// Puzzles
+	else if (object == outButton) {
+		playerHp -= static_cast<int>(playerMaxHp * 0.1f);
+		for (int y = 0; y < 3; y++) {
+			for (int x = 0; x < 3; x++) {
+				hideObject(puzzleList[y][x].obj);
+			}
+		}
+
+		// Player's hp can be 0
+		if (playerHp <= 0) {
+			// do something
+		}
+
+		currentScene = tower6F_Scene;
+		enterScene(tower6F_Scene);
+	}
+	else if (object == puzzleList[0][0].obj) {
+		isTouching(0, 0);
+	}
+	else if (object == puzzleList[0][1].obj) {
+		isTouching(1, 0);
+	}
+	else if (object == puzzleList[0][2].obj) {
+		isTouching(2, 0);
+	}
+	else if (object == puzzleList[1][0].obj) {
+		isTouching(0, 1);
+	}
+	else if (object == puzzleList[1][1].obj) {
+		isTouching(1, 1);
+	}
+	else if (object == puzzleList[1][2].obj) {
+		isTouching(2, 1);
+	}
+	else if (object == puzzleList[2][0].obj) {
+		isTouching(0, 2);
+	}
+	else if (object == puzzleList[2][1].obj) {
+		isTouching(1, 2);
+	}
+	else if (object == puzzleList[2][2].obj) {
+		isTouching(2, 2);
 	}
 }
 
@@ -790,7 +1037,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 	// 82: Left arrow-key
 	if (code == 82) {
-		if (currentScene == tower5F_Scene) {
+		if (currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
 			dx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 		else if (currentScene == battle5F_Scene) {
@@ -799,7 +1046,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 	}
 	// 83: Right arrow-key
 	else if (code == 83) {
-		if (currentScene == tower5F_Scene) {
+		if (currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
 			dx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 		else if (currentScene == battle5F_Scene) {
@@ -810,21 +1057,73 @@ void keyboardCallback(KeyCode code, KeyState state) {
 	else if (code == 84) {
 		// If current scene is tower and player can battle, then change a scene.
 		if (currentScene == tower5F_Scene) {
-			currentScene = battle5F_Scene;
-			enterScene(currentScene);
+			if (enemyTX_FIXED - 30 < playerX and playerX < enemyTX_FIXED + 100) {
+				currentScene = battle5F_Scene;
+				enterScene(currentScene);
 
-			battle();
+				dx = 0;
+				iconDx = 0;
+				iconDy = 0;
+
+				battle();
+			}
+			else if (playerX > playerX_MAX - 100 and not enemyTShown) {
+				currentScene = tower6F_Scene;
+
+				playerX = 50;
+				locateObject(player, currentScene, playerX, playerY_FIXED);
+
+				enterScene(currentScene);
+			}
 		}
 		// Else if current scene is battle, then player move to upper direction.
 		else if (currentScene == battle5F_Scene) {
 			iconDy = MOVE_SPEED;
 			iconDy += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
+		else if (currentScene == tower6F_Scene) {
+			if (puzzleTX_FIXED - 30 < playerX and playerX < puzzleTX_FIXED + 200 and puzzleTShown) {
+				currentScene = game6F_Scene;
+				enterScene(currentScene);
+
+				dx = 0;
+
+				puzzleInit();
+			}
+			else if (puzzleTX_FIXED - 30 < playerX and playerX < puzzleTX_FIXED + 200 and not puzzleTShown) {
+				printf("keyboardCallback: Go to Floor 7 \n");
+				// currentScene = tower7F_Scene;
+
+				// playerX = 50;
+				// locateObject(player, currentScene, playerX, playerY_FIXED);
+
+				// enterScene(currentScene);
+			}
+		}
 	}
 	// 85: Down arrow-key
 	else if (code == 85) {
 		if (currentScene == battle5F_Scene) {
 			iconDy -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+		}
+	}
+	// 59: Escape key
+	else if (code == 59) {
+		if (currentScene == game6F_Scene) {
+			playerHp -= static_cast<int>(playerMaxHp * 0.1f);
+			for (int y = 0; y < 3; y++) {
+				for (int x = 0; x < 3; x++) {
+					hideObject(puzzleList[y][x].obj);
+				}
+			}
+
+			// Player's hp can be 0
+			if (playerHp <= 0) {
+				// do something
+			}
+
+			currentScene = tower6F_Scene;
+			enterScene(tower6F_Scene);
 		}
 	}
 }
